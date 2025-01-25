@@ -1,0 +1,301 @@
+.nf
+NAME:
+	refcat - read stars from Refcat2
+
+SYNOPSIS:
+	refcat RA[deg] Dec[deg] [options]
+
+DESCRIPTION: 
+	refcat reads ATLAS Refcat2 data files and returns stars within a
+	distance of specified coordinates.  Compile with:
+
+	  cc -o refcat -O -Wall refcat.c -lm
+
+	ATLAS Refcat2 is an all-sky compendium of Gaia DR2 coordinates and
+	magnitudes, griz (AB magnitudes on Pan-STARRS bandpasses) photometry
+	from various sources, and 2MASS photometry.  See Tonry et al. 2018 ApJ
+	867,105 or arXiv 1809.09157, for a full description.  Data files may
+	be obtained from https://archive.stsci.edu/prepds/atlas-refcat2,
+	and http://doi.org/10.17909/t9-2p3r-7651.  The catalog is normally
+	provided as a set of bzip2 compressed tar archives of 64800 files, one
+	for each (coordinate) square degree in the sky.  The file names
+	reflect the coordinate location, rrr+dd.rc2; for example 270-20.rc2
+	is the square degree with 270<=RA<271 and -20<=Dec<Dec-19.  The data
+	are given in comma separated variable format (CSV), using scaled
+	integers for all real numbers.  Please refer to the paper for details
+	on the exact integer format, units, and integer scale factors in the
+	CSV files.  refcat processes integers and produces output with the
+	units and typical values listed in this table.
+
+        Col Varname     Value    Units       Description
+         1  RA      280.00001672 [deg]     RA, Gaia DR2 J2000, epoch 2015.5
+         2  Dec     -19.67818581 [deg]     Dec, Gaia DR2 J2000, epoch 2015.5
+         3  plx           0.98   [mas]     Parallax from Gaia DR2
+         4  dplx          0.10   [mas]     Parallax uncertainty
+         5  pmra          1.14   [mas/yr]  RA proper motion from Gaia DR2
+         6  dpmra         0.16   [mas/yr]  RA proper motion uncertainty
+         7  pmdec       -14.60   [mas/yr]  Dec proper motion from Gaia DR2
+         8  dpmdec        0.15   [mas/yr]  Dec proper motion uncertainty
+         9  Gaia         15.884  [mag]     Gaia DR2 G magnitude
+        10  dGaia         0.001  [mag]     Gaia G magnitude uncertainty
+        11  BP           16.472  [mag]     Gaia DR2 G_BP magnitude
+        12  dBP           0.010  [mag]     Gaia G_BP magnitude uncertainty
+        13  RP           15.137  [mag]     Gaia DR2 G_RP magnitude
+        14  dRP           0.001  [mag]     Gaia G_RP magnitude uncertainty
+        15  Teff       4729      [K]       Gaia stellar effective temp
+        16  AGaia         0.895  [mag]     Gaia G-band extinction for this star
+        17  dupvar        2      [...]     Gaia flags coded as CONSTANT (0),
+                                              VARIABLE (1), or NOT_AVAILABLE (2)
+                                              + 4*DUPLICATE
+        18  Ag            1.234  [mag]     SFD total column g-band extinction
+        19  rp1           5.0    [arcsec]  Radius where cumulative G flux
+                                             exceeds 0.1x this star
+        20  r1            5.0    [arcsec]  Radius where cumulative G flux
+                                             exceeds 1x this star
+        21  r10          15.5    [arcsec]  Radius where cumulative G flux
+                                             exceeds 10x this star
+        22  g            16.657  [mag]     Pan-STARRS g_P1 magnitude
+        23  dg            0.010  [mag]     g_P1 magnitude uncertainty
+        24  gchi          0.23   [...]     chi^2/DOF for g contributors
+        25  gcontrib     1f      [%02x]    Bitmap of g contributors
+        26  r            15.915  [mag]     Pan-STARRS r_P1 magnitude
+        27  dr            0.012  [mag]     r_P1 magnitude uncertainty
+        28  rchi          0.41   [...]     chi^2/DOF for r contributors
+        29  rcontrib     3f      [%02x]    Bitmap of r contributors
+        30  i            15.578  [mag]     Pan-STARRS i_P1 magnitude
+        31  di            0.010  [mag]     i_P1 magnitude uncertainty
+        32  ichi          0.49   [...]     chi^2/DOF for i contributors
+        33  icontrib     0f      [%02x]    Bitmap of i contributors
+        34  z            15.346  [mag]     Pan-STARRS z_P1 magnitude
+        35  dz            0.012  [mag]     z_P1 magnitude uncertainty
+        36  zchi          0.00   [...]     chi^2/DOF for z contributors
+        37  zcontrib     06      [%02x]    Bitmap of z contributors
+        38  nstat         0      [...]     Count of griz outliers
+        39  J            14.105  [mag]     2MASS J magnitude
+        40  dJ            0.036  [mag]     2MASS J magnitude uncertainty
+        41  H            14.105  [mag]     2MASS H magnitude
+        42  dH            0.053  [mag]     2MASS H magnitude uncertainty
+        43  K            13.667  [mag]     2MASS K magnitude
+        44  dK            0.044  [mag]     2MASS K magnitude uncertainty
+
+	refcat requires an RA, Dec [deg] coordinate on the sky as mandatory
+	first arguments, and it returns all stars within an angular radius R
+	"-rad R" or a rectangle "-rect dRA,dDec" that extends +/-dRA[deg] and
+	+/-dDec[deg] from the N-S, E-W great circles that pass through RA, Dec.
+	Depending on the placement and size of the area requested, more than
+	one degree file may need to be read.
+
+	refcat also skips stars for which all of g,r,i are fainter than a
+	magnitude limit ("-mlim m"), default 18.0.  Note that the degree file
+	tarballs are also segregated into 5 magnitude chunks: m<16 (105M
+	stars), 16<=m<17 (107M stars), 17<=m<18 (204M stars), 18<=m<19 (369M
+	stars), and 19<=m (206M stars), so access to stars fainter than m=16
+	either requires concatenating the degree files from different tarballs
+	or else giving refcat multiple directories to read.
+
+	refcat expects to find all the Refcat2 degree files in a directory
+	P "-dir P" with filenames of the form rrr+dd.X, where the extension
+	X is provided by "-exten X" (default X=rc2).
+
+	These degree files may be in the CSV (comma separated variable) format
+	distributed as the compressed tarballs, or they may be in binary
+	format.  The binary format requires about 40% the storage of the
+	uncompressed CSV format and access is about 2x faster.  However, the
+	binary format may not be particularly portable and users are encouraged
+	to distribute the CSV and build their own binary files using the
+	"-CSV_to_binary" option described below.  refcat can be instructed to
+	read CSV text files with the "-csv" option or binary files with the
+	"-bin" option.  The default is to attempt to auto-detect the format
+	from the first file read.
+
+	Note that the binary format undergoes slight, lossy compression.  The
+	RA, Dec are only retained to 100 ndeg, the uncertainties on magnitudes
+	are rounded to 2 mmag and truncated at 0.511 magnitude, the proxmity
+	variables are rounded to 0.2 arcsec with the value of 51.1 arcsec
+	indicating that the flux threshold was not met, and the chi^2/N values
+	for the griz combinations are rounded to the nearest 0.1.
+
+	Using binary data files is very advantageous for refcat but may cause
+	problems with portability.  refcat tries to swap bytes if it
+	encounters a binary file with the wrong byte order (Intel is
+	low-endian, ARM processors may be big-endian), but any problem with
+	incompatibility or corruption renders a binary file useless.  refcat
+	therefore offers a "hijack mode" to read a full set of CSV files and
+	create a new set of binary files.  This option is invoked with the
+	flag "-CSV_to_binary B" (dummy RA, Dec are still mandatory).  During
+	this binary creation mode refcat reads all 64800 square degree files
+	named P/rrr+dd.X from the directory P and the extension X, and writes
+	a new binary file named named B/rrr+dd.X for each in a new directory B
+	created ahead of time.  This files are then available for use by
+	refcat with auto-detect (or the "-bin" option).  If the "-dir" option
+	is invoked with multiple input directories the stars are concatenated
+	into the output binary files.  Note that these stars are no longer
+	sorted in RA as in the CSV files; if this matters concatenate the
+	CSV files first into a temporary directory and then convert to binary.
+
+	The default output from refcat is minimal "ATLAS format", meaning
+	RA, Dec, g, r, i, z, J, cyan, orange.  If the option "-all" is
+	invoked, refcat instead writes all 44 fields from Refcat2 with a
+	header line containing variable names for each field.  This output
+	may then be run through some sort of filter to select the columns
+	and stars that are desired by the user or apply modifications such
+	as conversion of coordinates to a different epoch using the pmra
+	and pmdec fields.
+
+	Custom output may be requested with the "-var v1,v2,..." option.  A
+	list of variable names "v1,v2,..." from the Varname column of the
+	table above is parsed and those variables are written using the units
+	from the Units column.  Tne default is to write a header line.
+
+	Whether or not a header line is written can be controlled with the
+	"-hdr" and "-nohdr" options (following output specification).
+
+	The source code refcat.c may be easily modified to provide other
+	output options or defaults, of course.
+
+	For large area requests many files may be accessed, and the user
+	should be aware of latencies and performance of disks and network file
+	systems such as NFS.  refcat takes about 7 usec per star retrieved and
+	written in ATLAS format, and about 2x longer using the full, "-all"
+	format.  The time actually retrieving the data from binary files is
+	approximately 0.6 usec per star, so custom modification of refcat.c
+	output may be indicated when performance is a priority.  These timings
+	may be slower when many files are accessed, for example at the poles.
+
+OPTIONS:
+	-dir P1[,P2...]	     [default P=/atlas/cal/RC2/m17]
+	  Read the data files from directory P.  If more than one directory
+	  is present (separated by commas), read each stars from directory
+	  in turn.
+
+	-exten X     [default X=rc2]
+	  Data files have file names P/rrr+dd.X
+
+	-csv
+	-bin
+	  Request refcat to read from CSV text or binary files of the
+	  form P/rrr+dd.X.  The default is to attempt to auto-detect
+	  the file type.
+
+	-rect dR,dD   [default 0.1,0.1]
+	-rad R
+	  Return stars within a circle of radius R deg or a rectangle
+	  of size +/-dR, +/-dD deg from the N-S, E-W great circles that
+	  pass through the central point RA, Dec.
+
+	-mlim m	     [default 18]
+	  Return only stars with the smallest of g,r,i less than or
+	  equal to m.
+
+	-rlim R	     [default 0]
+	  Return only isolated stars with with rp1>R
+
+	-hdr
+	-nohdr
+	  Print a header line?  Default is not for ATLAS output and yes
+	  for "-all" and "-var" output, but this following option overrides.
+	  
+	-all
+	  Return all 44 fields from Refcat2 according to the units given in
+	  the Units column of the table above.  A header gives the name of
+	  each of the 44 variables.  The default is to return ATLAS minimal
+	  results consisting of RA, Dec, g, r, i, z, J, c, and o with no
+	  header.
+
+	-var v1,v2,...
+	  Return the named variables from the Varname column of the table
+	  above.  The units are given by the Units column.  Variable name
+	  case is ignored.
+
+	-silent	     [default]
+	-verb
+	-VERB
+	  Request increasing levels of verbosity
+
+	-CSV_to_binary B   [default NULL]
+
+	  Hijack mode!  Read all 64800 square degree files in CSV format from
+	  directory P (or directories P1,P2...) rewrite them in binary format
+	  in directory B.  Use carefully - apart from checking that the input
+	  and output files are not the same, refcat is reading and writing
+	  files of the same name in different directories and will overwrite
+	  existing output files.
+
+EXAMPLES:
+	Untar the m<16 compressed tarball into a directory called 00_m_16:
+
+	  tar xjvf 00_m_16.tbz
+
+	Report all stars within +/-1 deg of RA, Dec 180,10 from these files:
+	(1357 stars, output in ATLAS format):
+
+	  refcat 180 10 -rect 1,1 -dir 00_m_16
+
+	Report all stars within a radius of 1 deg from RA, Dec 180,10.  Request
+	input file extension ".rc2" explicitly and a header line
+	(1064 stars, output in ATLAS format):
+
+	  refcat 180 10 -rad 1 -dir 00_m_16 -exten rc2 -hdr
+
+	Report all stars within a square of size +/-1 deg from RA, Dec 180,-90
+	(6147 stars, output in Refcat2 format):
+
+	  refcat 180 -90 -rect 1,1 -dir 00_m_16 -all
+
+	Report all stars within a square of size +/-1 deg from RA, Dec 180,-90
+	(6147 stars, output is RA Dec g dg r dr i di):
+
+	  refcat 180 -90 -rect 1,1 -dir 00_m_16 -var ra,dec,g,dg,r,dr,i,di
+
+	Report stars brighter than m<14 within a square of size +/-1 deg
+	(1489 stars, output in ATLAS format):
+
+	  refcat 180 -90 -rect 1,1 -mlim 14 -dir 00_m_16
+
+	Create a binary copy of each CSV file from the directory 00_m_16
+	having extension rc2 in the new directory m16.  This need only be done
+	once, each CSV file of the form 00_m_16/180-20.rc2 will have a new
+	binary counterpart m16/180-20.rc2 ready for for future use.
+
+	  mkdir -p m16
+	  refcat 0 0 -dir 00_m_16 -CSV_to_binary m16 -exten rc2
+
+	Report stars within a square of size +/-1 deg from binary files
+
+	  refcat 180 -90 -rect 1,1 -dir m16
+
+	Report stars with m<15 and (g-r)<0.5 (1063 of 2984 stars with m<15,
+	field numbers from the Col column of the table above)
+
+	  refcat 180 -90 -rect 1,1 -mlim 15 -all | \
+	    awk -v clr=0.5 '{g=$22; r=$26; if(g-r<clr) print $0}'
+
+	Report isolated stars whose nearest 10% flux contaminator is at least
+	10 arcsec distant (2769 stars)
+
+	  refcat 180 -90 -rect 1,1 -mlim 15 -rlim 10 -all
+
+	Report stars with m<18 by accessing multiple directories (35 stars)
+
+	  refcat 180 10 -rad 0.1 -mlim 18 -dir 00_m_16,16_m_17,17_m_18
+
+	If you want to combine files from multiple magnitude chunks, for
+	example 00_m_16/180+10.rc2 and 16_m_17/180+10.rc2 refcat can read
+	all CSV text files and convert to binary format.
+
+	  tar xjvf 00_m_16.tbz		# Untar first chunk
+	  tar xjvf 16_m_17.tbz		# Untar second chunk
+	  mkdir -p m17			# Make a destination directory m17
+	  refcat 0 0 -dir 00_m_16,16_m_17 -CSV_to_binary m17
+
+BUGS AND CHANGES:
+	181119: fixed bug when -rad entirely within a sqdeg
+	181024: initial revision
+
+SEE ALSO:
+
+
+AUTHOR:
+	John Tonry
+
+VERSION:
